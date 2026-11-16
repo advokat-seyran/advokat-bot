@@ -2,8 +2,9 @@ import asyncio
 import json
 import logging
 import os
-from pathlib import Path
+import socket
 from aiogram import Bot, Dispatcher, F, types
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.filters import CommandStart, Command
 from aiogram.types import (
     ReplyKeyboardMarkup,
@@ -13,13 +14,12 @@ from aiogram.types import (
 )
 
 # =====================================================================
-# ГОТОВЫЕ НАСТРОЙКИ: ПРИЁМНАЯ АДВОКАТА МИРЗОЯНА С.Э. (@Advokat_Mirzoyan_bot)
+# НАСТРОЙКИ: ПРИЁМНАЯ АДВОКАТА МИРЗОЯНА С.Э. (@Advokat_Mirzoyan_bot)
 # =====================================================================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "9176238019:AAFfYYoBo2muMRbF8YTGcSVo0qA7uHI-7tc")
 ADMIN_USERNAME = "advokat_seyran"
 LAWYER_PHONE = "+7 (919) 890-07-78"
 
-# Надёжный путь к файлу настроек в папке пользователя + дублирование в памяти
 CONFIG_FILE = os.path.join(
     os.path.expanduser("~"), "mirzoyan_bot_config.json"
 )
@@ -27,7 +27,11 @@ RUNTIME_CONFIG = {"admin_id": None, "video_note_id": None}
 
 logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=BOT_TOKEN)
+# Принудительное использование IPv4 для стабильной работы в Docker на Bothost
+session = AiohttpSession()
+session._connector_init["family"] = socket.AF_INET
+
+bot = Bot(token=BOT_TOKEN, session=session)
 dp = Dispatcher()
 
 user_category = {}
@@ -52,9 +56,7 @@ def save_config(data):
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(RUNTIME_CONFIG, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        logging.warning(
-            f"Настройки сохранены в оперативной памяти (запись на диск ограничена Windows): {e}"
-        )
+        logging.warning(f"Настройки сохранены в оперативной памяти: {e}")
 
 
 def check_and_bind_admin(user: types.User) -> int | None:
@@ -66,9 +68,6 @@ def check_and_bind_admin(user: types.User) -> int | None:
     return config.get("admin_id")
 
 
-# =====================================================================
-# КЛАВИАТУРЫ ПРИЁМНОЙ (КАТЕГОРИИ ДЕЛ)
-# =====================================================================
 def get_main_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -121,9 +120,6 @@ def get_client_reply_kb():
     )
 
 
-# =====================================================================
-# УПРАВЛЕНИЕ ДЛЯ АДВОКАТА (@advokat_seyran)
-# =====================================================================
 @dp.message(Command("delvideo"))
 async def cmd_delvideo(message: types.Message):
     admin_id = check_and_bind_admin(message.from_user)
@@ -151,9 +147,6 @@ async def handle_video_note(message: types.Message):
         await forward_to_lawyer(message, "Видеосообщение от доверителя")
 
 
-# =====================================================================
-# СТАРТ БОТА И ВЫБОР КАТЕГОРИИ
-# =====================================================================
 @dp.message(CommandStart())
 @dp.message(F.text == "🔄 В главное меню")
 async def cmd_start(message: types.Message):
@@ -251,9 +244,6 @@ async def select_category(callback: types.CallbackQuery):
     await callback.answer()
 
 
-# =====================================================================
-# МГНОВЕННАЯ ПЕРЕСЫЛКА ДОКУМЕНТОВ, ГОЛОСОВЫХ И КОНТАКТОВ АДВОКАТУ
-# =====================================================================
 async def forward_to_lawyer(message: types.Message, content_type_label: str):
     user = message.from_user
     admin_id = check_and_bind_admin(user)
@@ -328,7 +318,7 @@ async def handle_text(message: types.Message):
 async def main():
     load_config()
     print("===============================================================")
-    print("Защищенная версия Приёмной адвоката Мирзояна С.Э. ЗАПУЩЕНА!")
+    print("Облачная версия Приёмной адвоката Мирзояна С.Э. ЗАПУЩЕНА!")
     print("===============================================================")
     await dp.start_polling(bot)
 
